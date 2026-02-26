@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>DB Escape FPS</title>
+<style>
+body { margin:0; overflow:hidden; }
+#ui {
+position:absolute;
+top:10px;
+left:10px;
+color:white;
+font-family:Arial;
+}
+#completion{
+position:absolute;
+top:10px;
+right:10px;
+color:white;
+font-family:Arial;
+}
+#questionBox{
+position:absolute;
+top:20%;
+left:30%;
+width:40%;
+background:white;
+padding:20px;
+display:none;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+Score: <span id="score">0</span>
+</div>
+
+<div id="completion">
+Completed: <span id="done">0</span>/8
+</div>
+
+<div id="questionBox">
+<h3 id="question"></h3>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+
+let scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+let camera = new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);
+let renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth,window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+let player = new THREE.Group();
+scene.add(player);
+player.position.set(0,2,10);
+player.add(camera);
+camera.position.set(0,0,0);
+
+// Controls
+let moveForward=false, moveBackward=false, moveLeft=false, moveRight=false, sprint=false;
+let gravity=0.01, yVelocity=0, isOnGround=true;
+let playerHeight=2;
+
+document.body.addEventListener("click",()=>{ document.body.requestPointerLock(); });
+
+document.addEventListener("mousemove",(e)=>{
+if(document.pointerLockElement===document.body){
+camera.rotation.y -= e.movementX*0.002;
+}
+});
+
+let currentQuestion=null;
+let score=0;
+let totalQuestions=13;
+let laptops=[];
+let exitDoor=null;
+
+// KEYBOARD
+document.addEventListener("keydown",(e)=>{
+
+if(!currentQuestion){
+if(e.key==="w") moveForward=true;
+if(e.key==="s") moveBackward=true;
+if(e.key==="a") moveLeft=true;
+if(e.key==="d") moveRight=true;
+if(e.key==="Shift") sprint=true;
+if(e.code==="Space" && isOnGround){
+yVelocity=0.25;
+isOnGround=false;
+}
+if(e.key==="e") interact();
+}
+
+if(currentQuestion){
+if(e.key.toLowerCase()==="a") checkAnswer(0);
+if(e.key.toLowerCase()==="b") checkAnswer(1);
+if(e.key.toLowerCase()==="c") checkAnswer(2);
+}
+
+});
+
+document.addEventListener("keyup",(e)=>{
+if(e.key==="w") moveForward=false;
+if(e.key==="s") moveBackward=false;
+if(e.key==="a") moveLeft=false;
+if(e.key==="d") moveRight=false;
+if(e.key==="Shift") sprint=false;
+});
+
+// ===== LIGHTING (REQUIRED FOR MeshStandardMaterial) =====
+let ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+let directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+directionalLight.position.set(20, 30, 10);
+scene.add(directionalLight);
+
+
+// ===== FLOOR (VERY BIG) =====
+let floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(200,200),
+    new THREE.MeshStandardMaterial({ color: 0x444444 })
+);
+floor.rotation.x = Math.PI / 2;
+scene.add(floor);
+
+// ===== WALLS =====
+let wallMaterial = new THREE.MeshStandardMaterial({ color: 0x2196f3 });
+let walls = [];
+
+function createWall(x,y,z,w,h,d){
+    let wall = new THREE.Mesh(
+        new THREE.BoxGeometry(w,h,d),
+        wallMaterial
+    );
+    wall.position.set(x,y,z);
+    scene.add(wall);
+    walls.push(wall);
+}
+
+// 200x200 room (walls at ±100)
+createWall(0,5,-100,200,10,2);   // Back
+createWall(0,5,100,200,10,2);    // Front
+createWall(-100,5,0,2,10,200);   // Left
+createWall(100,5,0,2,10,200);    // Right
+
+// TEACHER (SPRITE)
+let teacherTexture=new THREE.TextureLoader().load("teacher.png");
+let teacherMaterial=new THREE.SpriteMaterial({map:teacherTexture});
+let teacher=new THREE.Sprite(teacherMaterial);
+teacher.scale.set(4,6,1);
+teacher.position.set(0,3,-15);
+scene.add(teacher);
+
+let teacherActive = false;
+let teacherSpeed = 0.01;   // slightly faster when angry
+let interactCooldown = false;
+let questionCooldown = false;   // prevents spam answering
+
+// QUESTIONS
+let questions=[
+{q:"What does SQL stand for?",o:["Structured Query Language","Simple Query List","System Query Logic"],a:0},
+
+{q:"Primary key must be?",o:["Duplicate","Unique","Null"],a:1},
+
+{q:"Which command retrieves data?",o:["SELECT","DROP","DELETE"],a:0},
+
+{q:"2NF removes?",o:["Partial dependency","Transitive dependency","Null values"],a:0},
+
+{q:"Which constraint prevents duplicates?",o:["UNIQUE","CHECK","FOREIGN"],a:0},
+
+{q:"Foreign key links to?",o:["Primary key","Unique key","Index"],a:0},
+
+{q:"DELETE does?",o:["Removes rows","Drops table","Creates table"],a:0},
+
+{q:"GROUP BY is used to?",o:["Aggregate data","Delete rows","Update data"],a:0},
+
+{q:"Which SQL command updates data?",o:["MODIFY","UPDATE","CHANGE"],a:1},
+
+{q:"Which clause filters rows?",o:["GROUP BY","WHERE","ORDER BY"],a:1},
+
+{q:"Which command removes a table?",o:["DELETE","REMOVE","DROP"],a:2},
+
+{q:"COUNT() is used to?",o:["Sort rows","Delete rows","Count rows"],a:2},
+
+{q:"ORDER BY is used to?",o:["Join tables","Sort results","Delete data"],a:1}
+];
+
+// LAPTOPS (SPRITE)
+let laptopTexture=new THREE.TextureLoader().load("laptop.png");
+let positions=[
+[-60,-60],
+[60,-60],
+[-60,60],
+[60,60],
+[0,-80],
+[0,80],
+[-80,0],
+[80,0],
+[-40,40],
+[40,-40],
+[-70,20],
+[20,70],
+[70,-20]
+];
+
+positions.forEach((p,i)=>{
+let material=new THREE.SpriteMaterial({map:laptopTexture});
+let laptop=new THREE.Sprite(material);
+laptop.scale.set(3,2,1);
+laptop.position.set(p[0],1.5,p[1]);
+laptop.userData.question=questions[i];
+scene.add(laptop);
+laptops.push(laptop);
+});
+
+function interact(){
+
+if(interactCooldown) return;
+
+laptops.forEach((l,i)=>{
+    if(player.position.distanceTo(l.position)<3){
+        askQuestion(l,i);
+        interactCooldown = true;
+
+        // 2 second cooldown for pressing E
+        setTimeout(()=>{
+            interactCooldown = false;
+        },2000);
+    }
+});
+
+if(exitDoor && player.position.distanceTo(exitDoor.position)<3){
+    alert("YOU ESCAPED! FINAL SCORE: "+score);
+    location.reload();
+}
+}
+
+function askQuestion(laptop,index){
+
+// DO NOT reset teacherActive here
+
+let q=laptop.userData.question;
+currentQuestion={correct:q.a,laptop:laptop,index:index};
+
+document.getElementById("question").innerHTML=
+q.q+"<br><br>"+
+"A) "+q.o[0]+"<br>"+
+"B) "+q.o[1]+"<br>"+
+"C) "+q.o[2]+"<br><br>Press A / B / C";
+
+document.getElementById("questionBox").style.display="block";
+}
+
+function checkAnswer(index){
+if(!currentQuestion || questionCooldown) return;
+
+questionCooldown = true; // start cooldown
+
+if(index === currentQuestion.correct){
+
+    score += 10;
+    document.getElementById("score").innerText = score;
+
+    scene.remove(currentQuestion.laptop);
+    laptops.splice(currentQuestion.index,1);
+
+    document.getElementById("done").innerText =
+    totalQuestions - laptops.length;
+
+    if(laptops.length === 0) spawnExit();
+
+}else{
+    // WRONG ANSWER → TEACHER PERMANENT AGGRO
+    teacherActive = true;
+}
+
+// DO NOT reset teacherActive if already true
+// So teacher remains angry forever once triggered
+
+currentQuestion = null;
+document.getElementById("questionBox").style.display = "none";
+
+// 2 SECOND COOLDOWN
+setTimeout(()=>{
+    questionCooldown = false;
+},2000);
+}
+
+function spawnExit(){
+exitDoor=new THREE.Mesh(
+new THREE.BoxGeometry(4,6,1),
+new THREE.MeshBasicMaterial({color:0x00ff00})
+);
+exitDoor.position.set(0,3,19);
+scene.add(exitDoor);
+alert("All questions completed! Exit door unlocked!");
+}
+
+function animate(){
+requestAnimationFrame(animate);
+
+let moveSpeed=sprint?0.3:0.15;
+
+let forward=new THREE.Vector3();
+camera.getWorldDirection(forward);
+forward.y=0;
+forward.normalize();
+
+let right=new THREE.Vector3();
+right.crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
+
+let newPos=player.position.clone();
+
+if(moveForward) newPos.add(forward.clone().multiplyScalar(moveSpeed));
+if(moveBackward) newPos.add(forward.clone().multiplyScalar(-moveSpeed));
+if(moveRight) newPos.add(right.clone().multiplyScalar(moveSpeed));
+if(moveLeft) newPos.add(right.clone().multiplyScalar(-moveSpeed));
+
+let canMove = true;
+
+let playerBox = new THREE.Box3().setFromCenterAndSize(
+    newPos,
+    new THREE.Vector3(1,2,1)
+);
+
+for(let wall of walls){
+    let wallBox = new THREE.Box3().setFromObject(wall);
+    if(playerBox.intersectsBox(wallBox)){
+        canMove = false;
+        break;
+    }
+}
+
+if(canMove){
+    player.position.copy(newPos);
+}
+
+// Gravity
+if(!isOnGround) yVelocity-=gravity;
+player.position.y+=yVelocity;
+
+if(player.position.y<=playerHeight){
+player.position.y=playerHeight;
+yVelocity=0;
+isOnGround=true;
+}else{
+isOnGround=false;
+}
+
+// Teacher Follow
+if(teacherActive){
+teacher.position.x+=(player.position.x-teacher.position.x)*teacherSpeed;
+teacher.position.z+=(player.position.z-teacher.position.z)*teacherSpeed;
+}
+
+if(player.position.distanceTo(teacher.position)<2){
+alert("Caught! Score: "+score);
+location.reload();
+}
+
+renderer.render(scene,camera);
+}
+animate();
+
+</script>
+</body>
+</html>
