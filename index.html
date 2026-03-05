@@ -23,14 +23,8 @@ display:flex;
 justify-content:space-between;
 }
 
-#leftMenu{
-text-align:center;
-}
-
-#leftMenu h1{
-font-size:60px;
-margin-bottom:30px;
-}
+#leftMenu{text-align:center;}
+#leftMenu h1{font-size:60px;margin-bottom:30px;}
 
 #playBtn{
 padding:15px 40px;
@@ -47,10 +41,7 @@ font-size:18px;
 line-height:30px;
 }
 
-#creator{
-margin-top:40px;
-font-weight:bold;
-}
+#creator{margin-top:40px;font-weight:bold;}
 
 /* ===== UI ===== */
 #ui{
@@ -59,6 +50,7 @@ top:10px;
 left:10px;
 color:white;
 display:none;
+font-size:20px;
 }
 
 #completion{
@@ -66,6 +58,26 @@ position:absolute;
 top:10px;
 right:10px;
 color:white;
+display:none;
+font-size:20px;
+}
+
+#countdown{
+position:absolute;
+top:50px;
+right:10px;
+color:yellow;
+display:none;
+font-size:20px;
+}
+
+#tutorialMsg{
+position:absolute;
+top:40%;
+width:100%;
+text-align:center;
+color:white;
+font-size:28px;
 display:none;
 }
 
@@ -82,7 +94,7 @@ display:none;
 </head>
 <body>
 
-<!-- ===== MENU ===== -->
+<!-- MENU -->
 <div id="menu">
 <div id="menuContent">
 <div id="leftMenu">
@@ -94,45 +106,24 @@ display:none;
 <h2>Manual</h2>
 W A S D - Move<br>
 Shift - Run<br>
-Space - Jump<br>
 E - Interact<br>
 A / B / C - Answer<br>
-
-<div id="creator">
-Creator = Muhammad Nasrullah Fitri
-</div>
+Space - Jump<br>
+<div id="creator">Creator = Muhammad Nasrullah Fitri K1T1 25/26 CD125 topic 1.5</div>
 </div>
 </div>
 </div>
 
-<!-- ===== GAME UI ===== -->
-<div id="ui">
-Score: <span id="score">0</span>
-</div>
-
-<div id="completion">
-Completed: <span id="done">0</span>/8
-</div>
-
-<div id="questionBox">
-<h3 id="question"></h3>
-</div>
+<!-- GAME UI -->
+<div id="ui">Score: <span id="score">0</span></div>
+<div id="completion">Completed: <span id="done">0</span>/0</div>
+<div id="countdown"></div>
+<div id="tutorialMsg"></div>
+<div id="questionBox"><h3 id="question"></h3></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 
-// ===== MENU LOGIC =====
-let gameStarted = false;
-
-document.getElementById("playBtn").onclick = function(){
-document.getElementById("menu").style.display="none";
-document.getElementById("ui").style.display="block";
-document.getElementById("completion").style.display="block";
-document.body.requestPointerLock();
-gameStarted = true;
-};
-
-// ===== THREE SETUP =====
 let scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
@@ -143,124 +134,120 @@ document.body.appendChild(renderer.domElement);
 
 let player = new THREE.Group();
 scene.add(player);
-player.position.set(0,2,10);
+player.position.set(0,2,20);
 player.add(camera);
 
-// ===== LIGHT =====
 scene.add(new THREE.AmbientLight(0xffffff,0.6));
 let light=new THREE.DirectionalLight(0xffffff,1);
 light.position.set(20,30,10);
 scene.add(light);
 
-// ===== FLOOR =====
+/* ===== BIGGER CLASSROOM ===== */
 let floor=new THREE.Mesh(
-new THREE.PlaneGeometry(200,200),
+new THREE.PlaneGeometry(400,400),
 new THREE.MeshStandardMaterial({color:0x444444})
 );
 floor.rotation.x=Math.PI/2;
 scene.add(floor);
 
-// ===== WALLS =====
-let wallMaterial=new THREE.MeshStandardMaterial({color:0x2196f3});
-let walls=[];
-
-function createWall(x,y,z,w,h,d){
-let wall=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMaterial);
-wall.position.set(x,y,z);
-scene.add(wall);
-walls.push(wall);
+let wallMat=new THREE.MeshStandardMaterial({color:0x2196f3});
+function wall(x,y,z,w,h,d){
+let m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat);
+m.position.set(x,y,z);
+scene.add(m);
 }
+wall(0,5,-200,400,10,2);
+wall(0,5,200,400,10,2);
+wall(-200,5,0,2,10,400);
+wall(200,5,0,2,10,400);
 
-createWall(0,5,-100,200,10,2);
-createWall(0,5,100,200,10,2);
-createWall(-100,5,0,2,10,200);
-createWall(100,5,0,2,10,200);
-
-// ===== TEACHER =====
+/* ===== TEACHER ===== */
 let teacherTexture=new THREE.TextureLoader().load("teacher.png");
 let teacher=new THREE.Sprite(new THREE.SpriteMaterial({map:teacherTexture}));
 teacher.scale.set(4,6,1);
-teacher.position.set(0,3,-15);
+teacher.position.set(0,3,-30);
 scene.add(teacher);
 
 let teacherActive=false;
-let teacherSpeed=0.02;
+let teacherSpeed=0.0005; // slower
 
-// ===== QUESTIONS =====
+/* ===== QUESTIONS ===== */
 let questions=[
 {q:"Primary key must be?",o:["Duplicate","Unique","Null"],a:1},
-{q:"Which command retrieves data?",o:["SELECT","DROP","DELETE"],a:0},
 {q:"Which clause filters rows?",o:["GROUP BY","WHERE","ORDER BY"],a:1},
-{q:"Which command removes a table?",o:["DELETE","REMOVE","DROP"],a:2},
-{q:"COUNT() is used to?",o:["Sort rows","Delete rows","Count rows"],a:2},
-{q:"ORDER BY is used to?",o:["Join tables","Sort results","Delete data"],a:1},
-{q:"Which SQL command updates data?",o:["MODIFY","UPDATE","CHANGE"],a:1},
-{q:"Foreign key links to?",o:["Primary key","Unique key","Index"],a:0}
+{q:"Which command removes table?",o:["DELETE","REMOVE","DROP"],a:2},
+{q:"Which joins returns all records?",o:["INNER","LEFT","RIGHT"],a:1},
+{q:"Which normal form removes partial dependency?",o:["1NF","2NF","3NF"],a:1},
+{q:"SQL stands for?",o:["Structured Query Language","Simple Query Logic","System Query Link"],a:0},
+{q:"Which command inserts data?",o:["PUT","INSERT","ADD"],a:1},
+{q:"Foreign key links to?",o:["Primary Key","Index","View"],a:0}
 ];
 
-let totalQuestions=questions.length;
 let laptops=[];
 let score=0;
 let currentQuestion=null;
 let interactCooldown=false;
 
-// ===== LAPTOPS =====
+document.getElementById("completion").innerHTML =
+"Completed: <span id='done'>0</span>/"+questions.length;
+
 let laptopTexture=new THREE.TextureLoader().load("laptop.png");
 
-questions.forEach((q,i)=>{
+questions.forEach((q)=>{
 let laptop=new THREE.Sprite(new THREE.SpriteMaterial({map:laptopTexture}));
 laptop.scale.set(3,2,1);
-laptop.position.set((Math.random()*160)-80,1.5,(Math.random()*160)-80);
+laptop.position.set((Math.random()*350)-175,1.5,(Math.random()*350)-175);
 laptop.userData.question=q;
 scene.add(laptop);
 laptops.push(laptop);
 });
 
-// ===== CONTROLS =====
-let moveForward=false, moveBackward=false, moveLeft=false, moveRight=false, sprint=false;
-let gravity=0.01, yVelocity=0, isOnGround=true;
+/* ===== CONTROLS ===== */
+let keys={};
+
+document.addEventListener("keydown",(e)=>{
+keys[e.key.toLowerCase()]=true;
+});
+
+document.addEventListener("keyup",(e)=>{
+keys[e.key.toLowerCase()]=false;
+});
 
 document.addEventListener("mousemove",(e)=>{
-if(document.pointerLockElement===document.body && gameStarted){
+if(document.pointerLockElement===document.body){
 camera.rotation.y-=e.movementX*0.002;
 }
 });
 
-document.addEventListener("keydown",(e)=>{
+/* ===== MENU START ===== */
+document.getElementById("playBtn").onclick=function(){
+document.getElementById("menu").style.display="none";
+document.getElementById("ui").style.display="block";
+document.getElementById("completion").style.display="block";
+document.getElementById("countdown").style.display="block";
+document.body.requestPointerLock();
 
-if(!gameStarted) return;
+let tutorialTime=10;
+let countdownDisplay=document.getElementById("countdown");
+countdownDisplay.innerText="Teacher runs in: "+tutorialTime;
 
-if(!currentQuestion){
-if(e.key==="w") moveForward=true;
-if(e.key==="s") moveBackward=true;
-if(e.key==="a") moveLeft=true;
-if(e.key==="d") moveRight=true;
-if(e.key==="Shift") sprint=true;
-if(e.key==="e") interact();
+let timer=setInterval(()=>{
+tutorialTime--;
+countdownDisplay.innerText="Teacher runs in: "+tutorialTime;
+if(tutorialTime<=0){
+clearInterval(timer);
+countdownDisplay.innerText="Teacher is chasing!";
+teacherActive=true;
 }
+},1000);
+};
 
-if(currentQuestion){
-if(e.key.toLowerCase()==="a") checkAnswer(0);
-if(e.key.toLowerCase()==="b") checkAnswer(1);
-if(e.key.toLowerCase()==="c") checkAnswer(2);
-}
-
-});
-
-document.addEventListener("keyup",(e)=>{
-if(e.key==="w") moveForward=false;
-if(e.key==="s") moveBackward=false;
-if(e.key==="a") moveLeft=false;
-if(e.key==="d") moveRight=false;
-if(e.key==="Shift") sprint=false;
-});
-
-// ===== INTERACT =====
+/* ===== INTERACT ===== */
 function interact(){
 if(interactCooldown) return;
 
 laptops.forEach((l,i)=>{
-if(player.position.distanceTo(l.position)<3){
+if(player.position.distanceTo(l.position)<4){
 askQuestion(l,i);
 interactCooldown=true;
 setTimeout(()=>{interactCooldown=false;},2000);
@@ -268,21 +255,16 @@ setTimeout(()=>{interactCooldown=false;},2000);
 });
 }
 
-// ===== ASK =====
 function askQuestion(laptop,index){
 let q=laptop.userData.question;
 currentQuestion={correct:q.a,laptop:laptop,index:index};
 
 document.getElementById("question").innerHTML=
-q.q+"<br><br>"+
-"A) "+q.o[0]+"<br>"+
-"B) "+q.o[1]+"<br>"+
-"C) "+q.o[2];
+q.q+"<br><br>A) "+q.o[0]+"<br>B) "+q.o[1]+"<br>C) "+q.o[2];
 
 document.getElementById("questionBox").style.display="block";
 }
 
-// ===== CHECK =====
 function checkAnswer(index){
 if(!currentQuestion) return;
 
@@ -292,7 +274,13 @@ document.getElementById("score").innerText=score;
 
 scene.remove(currentQuestion.laptop);
 laptops.splice(currentQuestion.index,1);
-document.getElementById("done").innerText=totalQuestions-laptops.length;
+document.getElementById("done").innerText=questions.length-laptops.length;
+
+if(laptops.length===0){
+alert("YOU ESCAPED! Final Score: "+score);
+location.reload();
+}
+
 }else{
 teacherActive=true; // permanent aggro
 }
@@ -301,16 +289,12 @@ currentQuestion=null;
 document.getElementById("questionBox").style.display="none";
 }
 
-// ===== ANIMATE =====
+/* ===== MAIN LOOP ===== */
 function animate(){
 requestAnimationFrame(animate);
 
-if(!gameStarted){
-renderer.render(scene,camera);
-return;
-}
+let moveSpeed = keys["shift"] ? 0.35 : 0.18;
 
-let moveSpeed=sprint?0.3:0.15;
 let forward=new THREE.Vector3();
 camera.getWorldDirection(forward);
 forward.y=0;
@@ -319,10 +303,18 @@ forward.normalize();
 let right=new THREE.Vector3();
 right.crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
 
-if(moveForward) player.position.add(forward.clone().multiplyScalar(moveSpeed));
-if(moveBackward) player.position.add(forward.clone().multiplyScalar(-moveSpeed));
-if(moveRight) player.position.add(right.clone().multiplyScalar(moveSpeed));
-if(moveLeft) player.position.add(right.clone().multiplyScalar(-moveSpeed));
+if(keys["w"]) player.position.add(forward.clone().multiplyScalar(moveSpeed));
+if(keys["s"]) player.position.add(forward.clone().multiplyScalar(-moveSpeed));
+if(keys["d"]) player.position.add(right.clone().multiplyScalar(moveSpeed));
+if(keys["a"]) player.position.add(right.clone().multiplyScalar(-moveSpeed));
+
+if(keys["e"]) interact();
+
+if(currentQuestion){
+if(keys["a"]) checkAnswer(0);
+if(keys["b"]) checkAnswer(1);
+if(keys["c"]) checkAnswer(2);
+}
 
 if(teacherActive){
 teacher.position.x+=(player.position.x-teacher.position.x)*teacherSpeed;
